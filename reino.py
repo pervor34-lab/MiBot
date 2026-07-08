@@ -252,8 +252,7 @@ class SistemaReinos(commands.Cog):
     @commands.command(name='setoro')
     @commands.has_permissions(administrator=True)
     async def set_oro(self, ctx, miembro: discord.Member, cantidad: int):
-        """Establece la cantidad exacta de oro de un usuario (solo admin)
-        Uso: f.setoro @usuario 500"""
+        """Dar oro a usuarios: f.setoro @usuario 500"""
         usuario_id = str(miembro.id)
         
         if not self.usuario_registrado(usuario_id):
@@ -277,7 +276,7 @@ class SistemaReinos(commands.Cog):
     @commands.command(name='setmadera')
     @commands.has_permissions(administrator=True)
     async def set_madera(self, ctx, miembro: discord.Member, cantidad: int):
-        """Establece la cantidad exacta de madera de un usuario (solo admin)"""
+        """Dar madera a usuarios f.setmadera @usuario 500"""
         usuario_id = str(miembro.id)
         
         if not self.usuario_registrado(usuario_id):
@@ -315,7 +314,7 @@ class SistemaReinos(commands.Cog):
     @commands.command(name='sethp')
     @commands.has_permissions(administrator=True)
     async def set_hp(self, ctx, miembro: discord.Member, cantidad: int):
-        """Establece el HP de un usuario (solo admin)"""
+        """Establece el HP de un usuario """
         usuario_id = str(miembro.id)
         
         if not self.usuario_registrado(usuario_id):
