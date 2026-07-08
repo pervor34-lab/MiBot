@@ -5,114 +5,261 @@ import os
 from datetime import datetime
 
 
+import discord
+from discord.ext import commands
+from discord.ui import Button, View, Select
+import json
+import os
+from datetime import datetime
+
+# ============ CONFIGURACIÓN DE MUROS ============
 MUROS = {
-        "muro": {
-            1: {
-                "nombre": "Muro de Madera",
-                "piedra": 10,
-                "madera": 20,
-                "oro": 5,
-                "hp": 50,
-                "defensa": 10
-            },
-            2: {
-                "nombre": "Muro de Piedra",
-                "piedra": 30,
-                "madera": 10,
-                "oro": 15,
-                "hp": 100,
-                "defensa": 25
-            },
-            3: {
-                "nombre": "Muro de Hierro",
-                "piedra": 50,
-                "madera": 5,
-                "oro": 30,
-                "hp": 200,
-                "defensa": 50
-            },
-            4: {
-                "nombre": "Muro de Obsidiana",
-                "piedra": 100,
-                "madera": 0,
-                "oro": 50,
-                "hp": 350,
-                "defensa": 80
-            },
-            5: {
-                "nombre": "Muro Legendario",
-                "piedra": 200,
-                "madera": 0,
-                "oro": 100,
-                "hp": 500,
-                "defensa": 120
-            }
-        },
-        "torre": {
-            1: {
-                "nombre": "Torre de Vigilancia",
-                "piedra": 20,
-                "madera": 15,
-                "oro": 10,
-                "hp": 30,
-                "ataque": 15
-            },
-            2: {
-                "nombre": "Torre de Arqueros",
-                "piedra": 40,
-                "madera": 20,
-                "oro": 25,
-                "hp": 60,
-                "ataque": 35
-            },
-            3: {
-                "nombre": "Torre de Magos",
-                "piedra": 60,
-                "madera": 10,
-                "oro": 50,
-                "hp": 100,
-                "ataque": 70
-            },
-            4: {
-                "nombre": "Torre del Dragón",
-                "piedra": 120,
-                "madera": 0,
-                "oro": 100,
-                "hp": 200,
-                "ataque": 120
-            }
-        },
-        "cuartel": {
-            1: {
-                "nombre": "Cuartel Pequeño",
-                "piedra": 15,
-                "madera": 25,
-                "oro": 10,
-                "soldados": 5
-            },
-            2: {
-                "nombre": "Cuartel Medio",
-                "piedra": 30,
-                "madera": 30,
-                "oro": 20,
-                "soldados": 15
-            },
-            3: {
-                "nombre": "Cuartel Grande",
-                "piedra": 50,
-                "madera": 40,
-                "oro": 35,
-                "soldados": 30
-            },
-            4: {
-                "nombre": "Ciudadela",
-                "piedra": 100,
-                "madera": 60,
-                "oro": 80,
-                "soldados": 60
-            }
-        }
+    "muro": {
+        1: {"nombre": "Muro de Madera", "piedra": 10, "madera": 20, "oro": 5, "hp": 50, "defensa": 10, "emoji": "🪵"},
+        2: {"nombre": "Muro de Piedra", "piedra": 30, "madera": 10, "oro": 15, "hp": 100, "defensa": 25, "emoji": "🪨"},
+        3: {"nombre": "Muro de Hierro", "piedra": 50, "madera": 5, "oro": 30, "hp": 200, "defensa": 50, "emoji": "⚙️"},
+        4: {"nombre": "Muro de Obsidiana", "piedra": 100, "madera": 0, "oro": 50, "hp": 350, "defensa": 80, "emoji": "🔮"},
+        5: {"nombre": "Muro Legendario", "piedra": 200, "madera": 0, "oro": 100, "hp": 500, "defensa": 120, "emoji": "⭐"}
+    },
+    "torre": {
+        1: {"nombre": "Torre de Vigilancia", "piedra": 20, "madera": 15, "oro": 10, "hp": 30, "ataque": 15, "emoji": "🗼"},
+        2: {"nombre": "Torre de Arqueros", "piedra": 40, "madera": 20, "oro": 25, "hp": 60, "ataque": 35, "emoji": "🏹"},
+        3: {"nombre": "Torre de Magos", "piedra": 60, "madera": 10, "oro": 50, "hp": 100, "ataque": 70, "emoji": "🔮"},
+        4: {"nombre": "Torre del Dragón", "piedra": 120, "madera": 0, "oro": 100, "hp": 200, "ataque": 120, "emoji": "🐉"}
+    },
+    "cuartel": {
+        1: {"nombre": "Cuartel Pequeño", "piedra": 15, "madera": 25, "oro": 10, "soldados": 5, "emoji": "🏛️"},
+        2: {"nombre": "Cuartel Medio", "piedra": 30, "madera": 30, "oro": 20, "soldados": 15, "emoji": "🏛️"},
+        3: {"nombre": "Cuartel Grande", "piedra": 50, "madera": 40, "oro": 35, "soldados": 30, "emoji": "🏛️"},
+        4: {"nombre": "Ciudadela", "piedra": 100, "madera": 60, "oro": 80, "soldados": 60, "emoji": "🏰"}
     }
+}
+
+class SeleccionEstructura(discord.ui.View):
+    def __init__(self, cog, usuario_id):
+        super().__init__(timeout=60)
+        self.cog = cog
+        self.usuario_id = usuario_id
+        self.tipo_seleccionado = None
+        self.nivel_seleccionado = None
+    
+    @discord.ui.select(
+        placeholder="🏗️ Selecciona el tipo de estructura",
+        options=[
+            discord.SelectOption(label="Muro", value="muro", emoji="🧱", description="Defensa de tu reino"),
+            discord.SelectOption(label="Torre", value="torre", emoji="🗼", description="Ataca a los enemigos"),
+            discord.SelectOption(label="Cuartel", value="cuartel", emoji="🏛️", description="Entrena soldados")
+        ]
+    )
+    async def select_tipo(self, interaction: discord.Interaction, select: discord.ui.Select):
+        if interaction.user.id != self.usuario_id:
+            await interaction.response.send_message("❌ Este menú no es para ti.", ephemeral=True)
+            return
+        
+        self.tipo_seleccionado = select.values[0]
+        
+        # Crear un nuevo select para el nivel
+        tipo_data = MUROS[self.tipo_seleccionado]
+        opciones_nivel = []
+        
+        for nivel, datos in tipo_data.items():
+            emoji = datos.get('emoji', '📊')
+            opciones_nivel.append(
+                discord.SelectOption(
+                    label=f"Nivel {nivel} - {datos['nombre']}",
+                    value=str(nivel),
+                    emoji=emoji,
+                    description=f"🏗️ {datos['nombre']}"
+                )
+            )
+        
+        view = SeleccionNivel(self.cog, self.usuario_id, self.tipo_seleccionado)
+        view.add_item(NivelSelect(view.cog, view.usuario_id, view.tipo))
+        
+        await interaction.response.edit_message(
+            content=f"✅ Has seleccionado **{select.values[0].capitalize()}**. Ahora elige el nivel:",
+            view=view,
+            embed=None
+        )
+
+class NivelSelect(discord.ui.Select):
+    def __init__(self, cog, usuario_id, tipo):
+        self.cog = cog
+        self.usuario_id = usuario_id
+        self.tipo = tipo
+        
+        tipo_data = MUROS[tipo]
+        opciones = []
+        
+        for nivel, datos in tipo_data.items():
+            emoji = datos.get('emoji', '📊')
+            opciones.append(
+                discord.SelectOption(
+                    label=f"Nivel {nivel} - {datos['nombre']}",
+                    value=str(nivel),
+                    emoji=emoji,
+                    description=f"🏗️ {datos['nombre']}"
+                )
+            )
+        
+        super().__init__(placeholder="📊 Selecciona el nivel", options=opciones)
+    
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.usuario_id:
+            await interaction.response.send_message("❌ Este menú no es para ti.", ephemeral=True)
+            return
+        
+        nivel = int(self.values[0])
+        self.cog.nivel_seleccionado = nivel
+        
+        # Mostrar información de la estructura
+        datos = MUROS[self.tipo][nivel]
+        
+        embed = discord.Embed(
+            title=f"🏗️ {datos['nombre']} (Nivel {nivel})",
+            color=discord.Color.blue()
+        )
+        
+        info_texto = ""
+        for key, value in datos.items():
+            if key not in ['nombre', 'emoji']:
+                emoji = "❤️" if key == "hp" else "🛡️" if key == "defensa" else "⚔️" if key == "ataque" else "👥" if key == "soldados" else "📊"
+                info_texto += f"{emoji} {key.capitalize()}: {value}\n"
+        
+        embed.add_field(
+            name="📊 Estadísticas",
+            value=info_texto,
+            inline=False
+        )
+        
+        embed.add_field(
+            name="💰 Recursos necesarios",
+            value=f"🪨 Piedra: {datos.get('piedra', 0)}\n🪵 Madera: {datos.get('madera', 0)}\n🪙 Oro: {datos.get('oro', 0)}",
+            inline=False
+        )
+        
+        # Verificar si el usuario ya tiene esta estructura
+        usuario_data = self.cog.obtener_usuario(self.usuario_id)
+        tiene_estructura = False
+        nivel_actual = 0
+        
+        if 'estructuras' in usuario_data and self.tipo in usuario_data['estructuras']:
+            tiene_estructura = True
+            nivel_actual = usuario_data['estructuras'][self.tipo]['nivel']
+            if nivel_actual >= nivel:
+                await interaction.response.send_message(
+                    f"⚠️ Ya tienes un {datos['nombre']} (Nivel {nivel_actual}). No puedes construir uno de nivel inferior.",
+                    ephemeral=True
+                )
+                return
+        
+        # Botones de acción
+        view = View()
+        
+        if tiene_estructura and nivel_actual < nivel:
+            # Botón para mejorar
+            mejorar_btn = Button(label=f"⬆️ Mejorar a Nv.{nivel}", style=discord.ButtonStyle.green, emoji="⬆️")
+            mejorar_btn.callback = lambda i: self.cog.construir_estructura_interactivo(i, self.tipo, nivel, "mejorar")
+            view.add_item(mejorar_btn)
+            
+            # Botón para cancelar
+            cancelar_btn = Button(label="❌ Cancelar", style=discord.ButtonStyle.red, emoji="❌")
+            cancelar_btn.callback = lambda i: self.cog.cancelar_construccion(i)
+            view.add_item(cancelar_btn)
+            
+            await interaction.response.edit_message(
+                content=f"📋 **{datos['nombre']}** (Nivel {nivel})\nTu estructura actual: Nivel {nivel_actual}",
+                embed=embed,
+                view=view
+            )
+        
+        elif not tiene_estructura:
+            # Botón para construir
+            construir_btn = Button(label=f"🏗️ Construir {datos['nombre']}", style=discord.ButtonStyle.green, emoji="🏗️")
+            construir_btn.callback = lambda i: self.cog.construir_estructura_interactivo(i, self.tipo, nivel, "construir")
+            view.add_item(construir_btn)
+            
+            # Botón para cancelar
+            cancelar_btn = Button(label="❌ Cancelar", style=discord.ButtonStyle.red, emoji="❌")
+            cancelar_btn.callback = lambda i: self.cog.cancelar_construccion(i)
+            view.add_item(cancelar_btn)
+            
+            await interaction.response.edit_message(
+                content=f"📋 **{datos['nombre']}** (Nivel {nivel}) - ¿Qué deseas hacer?",
+                embed=embed,
+                view=view
+            )
+        else:
+            await interaction.response.send_message(
+                f"⚠️ Ya tienes esta estructura (Nivel {nivel_actual}). Usa `f.mejorar {self.tipo}` para mejorarla.",
+                ephemeral=True
+            )
+
+class SeleccionNivel(discord.ui.View):
+    def __init__(self, cog, usuario_id, tipo):
+        super().__init__(timeout=60)
+        self.cog = cog
+        self.usuario_id = usuario_id
+        self.tipo = tipo
+
+class MuroSelect(discord.ui.Select):
+    def __init__(self, cog, usuario_id, tipo):
+        self.cog = cog
+        self.usuario_id = usuario_id
+        self.tipo = tipo
+        
+        tipo_data = MUROS[tipo]
+        opciones = []
+        
+        for nivel, datos in tipo_data.items():
+            emoji = datos.get('emoji', '📊')
+            opciones.append(
+                discord.SelectOption(
+                    label=f"Nivel {nivel} - {datos['nombre']}",
+                    value=str(nivel),
+                    emoji=emoji,
+                    description=f"🏗️ {datos['nombre']}"
+                )
+            )
+        
+        super().__init__(placeholder="📊 Selecciona el nivel", options=opciones)
+    
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.usuario_id:
+            await interaction.response.send_message("❌ Este menú no es para ti.", ephemeral=True)
+            return
+        
+        nivel = int(self.values[0])
+        datos = MUROS[self.tipo][nivel]
+        
+        embed = discord.Embed(
+            title=f"🏗️ {datos['nombre']} (Nivel {nivel})",
+            color=discord.Color.blue()
+        )
+        
+        info_texto = ""
+        for key, value in datos.items():
+            if key not in ['nombre', 'emoji']:
+                emoji = "❤️" if key == "hp" else "🛡️" if key == "defensa" else "⚔️" if key == "ataque" else "👥" if key == "soldados" else "📊"
+                info_texto += f"{emoji} {key.capitalize()}: {value}\n"
+        
+        embed.add_field(name="📊 Estadísticas", value=info_texto, inline=False)
+        embed.add_field(
+            name="💰 Recursos necesarios",
+            value=f"🪨 Piedra: {datos.get('piedra', 0)}\n🪵 Madera: {datos.get('madera', 0)}\n🪙 Oro: {datos.get('oro', 0)}",
+            inline=False
+        )
+        
+        view = View()
+        construir_btn = Button(label=f"🏗️ Construir {datos['nombre']}", style=discord.ButtonStyle.green, emoji="🏗️")
+        construir_btn.callback = lambda i: self.cog.construir_estructura_interactivo(i, self.tipo, nivel, "construir")
+        view.add_item(construir_btn)
+        
+        cancelar_btn = Button(label="❌ Cancelar", style=discord.ButtonStyle.red, emoji="❌")
+        cancelar_btn.callback = lambda i: self.cog.cancelar_construccion(i)
+        view.add_item(cancelar_btn)
+        
+        await interaction.response.edit_message(content="📋 Información de la estructura:", embed=embed, view=view)
 class SistemaReinos(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -293,247 +440,319 @@ class SistemaReinos(commands.Cog):
 
 #===========================CREACION DE MUROS/EDIFICACIONES====================================
     
-    @commands.command(name='crear')
-    async def crear_estructura(self, ctx, tipo: str, nivel: int = 1):
-        """Crea una estructura defensiva
-        Uso: f.crear muro 1
-        Tipos: muro, torre, cuartel
-        """
-        usuario_id = str(ctx.author.id)
-        
-        if not self.usuario_registrado(usuario_id):
-            await ctx.send(f"❌ {ctx.author.mention} No estás registrado. Usa `f.registrar`")
-            return
-        
-        # Verificar que el tipo existe
-        tipo = tipo.lower()
-        if tipo not in MUROS:
-            tipos_disponibles = ", ".join(MUROS.keys())
-            await ctx.send(f"❌ Tipo inválido. Tipos disponibles: {tipos_disponibles}")
-            return
-        
-        # Verificar que el nivel existe
-        if nivel not in MUROS[tipo]:
-            niveles_max = max(MUROS[tipo].keys())
-            await ctx.send(f"❌ Nivel inválido para {tipo}. Niveles disponibles: 1-{niveles_max}")
-            return
-        
-        datos_usuario = self.obtener_usuario(usuario_id)
-        stats = datos_usuario['estadisticas']
-        
-        # Obtener requisitos del nivel
-        requisitos = MUROS[tipo][nivel]
-        
-        # Verificar que tiene suficientes recursos
-        errores = []
-        if stats['piedra'] < requisitos.get('piedra', 0):
-            errores.append(f"🪨 Piedra: {stats['piedra']}/{requisitos.get('piedra', 0)}")
-        if stats['madera'] < requisitos.get('madera', 0):
-            errores.append(f"🪵 Madera: {stats['madera']}/{requisitos.get('madera', 0)}")
-        if stats['oro'] < requisitos.get('oro', 0):
-            errores.append(f"🪙 Oro: {stats['oro']}/{requisitos.get('oro', 0)}")
-        
-        if errores:
-            embed = discord.Embed(
-                title=f"❌ RECURSOS INSUFICIENTES",
-                description=f"No tienes suficientes recursos para construir **{requisitos['nombre']}** (Nv. {nivel})",
-                color=discord.Color.red()
-            )
-            embed.add_field(
-                name="📊 Recursos necesarios:",
-                value="\n".join(errores),
-                inline=False
-            )
-            await ctx.send(embed=embed)
-            return
-        
-        # Construir la estructura (quitar recursos)
-        stats['piedra'] -= requisitos.get('piedra', 0)
-        stats['madera'] -= requisitos.get('madera', 0)
-        stats['oro'] -= requisitos.get('oro', 0)
-        
-        # Guardar la estructura en el perfil del usuario
-        if 'estructuras' not in datos_usuario:
-            datos_usuario['estructuras'] = {}
-        
-        if tipo not in datos_usuario['estructuras']:
-            datos_usuario['estructuras'][tipo] = {
-                'nivel': nivel,
-                'construido': datetime.now().isoformat()
-            }
-        else:
-            # Si ya tiene una estructura de este tipo, actualizar al nuevo nivel
-            datos_usuario['estructuras'][tipo]['nivel'] = nivel
-            datos_usuario['estructuras'][tipo]['construido'] = datetime.now().isoformat()
-        
-        self.guardar_datos()
-        
-        # Crear embed de confirmación
-        embed = discord.Embed(
-            title=f"🏗️ ¡{requisitos['nombre']} CONSTRUIDO!",
-            description=f"Has construido un **{requisitos['nombre']}** (Nivel {nivel})",
-            color=discord.Color.green()
-        )
-        
-        # Mostrar estadísticas del muro
-        info_texto = ""
-        for key, value in requisitos.items():
-            if key not in ['nombre']:
-                emoji = "❤️" if key == "hp" else "🛡️" if key == "defensa" else "⚔️" if key == "ataque" else "👥" if key == "soldados" else "📊"
-                info_texto += f"{emoji} {key.capitalize()}: {value}\n"
-        
-        embed.add_field(
-            name="📊 Estadísticas de la estructura",
-            value=info_texto,
-            inline=False
-        )
-        
-        # Mostrar recursos restantes
-        embed.add_field(
-            name="💰 Recursos restantes",
-            value=f"🪙 Oro: {stats['oro']}\n🪵 Madera: {stats['madera']}\n🪨 Piedra: {stats['piedra']}",
-            inline=False
-        )
-        
-        embed.set_footer(text=f"ID: {usuario_id}")
-        await ctx.send(embed=embed)
+# En la clase SistemaReinos, dentro de reino.py
 
-    @commands.command(name='muros')
-    async def ver_muros(self, ctx, miembro: discord.Member = None):
-        """Muestra todas las estructuras de un usuario
-        Uso: f.muros @usuario"""
-        
-        if miembro is None:
-            miembro = ctx.author
-        
-        usuario_id = str(miembro.id)
-        
-        if not self.usuario_registrado(usuario_id):
-            await ctx.send(f"❌ {miembro.mention} no está registrado.")
-            return
-        
-        datos_usuario = self.obtener_usuario(usuario_id)
-        
-        embed = discord.Embed(
-            title=f"🏗️ ESTRUCTURAS DE {miembro.display_name}",
-            color=discord.Color.blue()
-        )
-        
-        if 'estructuras' not in datos_usuario or not datos_usuario['estructuras']:
-            embed.description = "❌ No tiene estructuras construidas aún"
-            await ctx.send(embed=embed)
-            return
-        
-        # Mostrar cada estructura
-        for tipo, info in datos_usuario['estructuras'].items():
-            nivel = info['nivel']
-            requisitos = MUROS.get(tipo, {}).get(nivel, {})
-            nombre = requisitos.get('nombre', f"{tipo.capitalize()} Nv.{nivel}")
-            
-            # Emojis según tipo
-            emojis = {"muro": "🧱", "torre": "🗼", "cuartel": "🏛️"}
-            emoji = emojis.get(tipo, "🏗️")
-            
-            # Información de la estructura
-            info_texto = f"**Nivel:** {nivel}\n"
-            info_texto += f"**Construido:** {info['construido'][:10]}\n"
-            
-            # Mostrar estadísticas
-            for key, value in requisitos.items():
-                if key not in ['nombre']:
-                    emoji_stat = "❤️" if key == "hp" else "🛡️" if key == "defensa" else "⚔️" if key == "ataque" else "👥" if key == "soldados" else "📊"
-                    info_texto += f"{emoji_stat} {key.capitalize()}: {value}\n"
-            
-            embed.add_field(
-                name=f"{emoji} {nombre}",
-                value=info_texto,
-                inline=False
-            )
-        
-        await ctx.send(embed=embed)
+@commands.command(name='construir')
+async def construir(self, ctx):
+    """Abre un menú interactivo para construir estructuras"""
+    usuario_id = ctx.author.id
+    
+    if not self.usuario_registrado(usuario_id):
+        await ctx.send(f"❌ {ctx.author.mention} No estás registrado. Usa `f.registrar`")
+        return
+    
+    embed = discord.Embed(
+        title="🏗️ SISTEMA DE CONSTRUCCIÓN",
+        description="Selecciona el tipo de estructura que deseas construir:",
+        color=discord.Color.blue()
+    )
+    
+    embed.add_field(
+        name="📋 Tipos disponibles",
+        value="🧱 **Muro** - Defensa de tu reino\n"
+              "🗼 **Torre** - Ataca a los enemigos\n"
+              "🏛️ **Cuartel** - Entrena soldados",
+        inline=False
+    )
+    
+    embed.set_footer(text="Selecciona una opción en el menú desplegable")
+    
+    view = SeleccionEstructura(self, usuario_id)
+    await ctx.send(embed=embed, view=view)
 
-    @commands.command(name='mejorar')
-    async def mejorar_estructura(self, ctx, tipo: str):
-        """Mejora una estructura al siguiente nivel
-        Uso: f.mejorar muro
-        """
-        usuario_id = str(ctx.author.id)
+@commands.command(name='muros')
+async def ver_muros_interactivo(self, ctx, miembro: discord.Member = None):
+    """Muestra todas las estructuras de un usuario"""
+    
+    if miembro is None:
+        miembro = ctx.author
+    
+    usuario_id = str(miembro.id)
+    
+    if not self.usuario_registrado(usuario_id):
+        await ctx.send(f"❌ {miembro.mention} no está registrado.")
+        return
+    
+    datos_usuario = self.obtener_usuario(usuario_id)
+    
+    embed = discord.Embed(
+        title=f"🏗️ ESTRUCTURAS DE {miembro.display_name}",
+        color=discord.Color.blue()
+    )
+    
+    if 'estructuras' not in datos_usuario or not datos_usuario['estructuras']:
+        embed.description = "❌ No tiene estructuras construidas aún"
+        await ctx.send(embed=embed)
+        return
+    
+    # Mostrar cada estructura
+    for tipo, info in datos_usuario['estructuras'].items():
+        nivel = info['nivel']
+        datos = MUROS.get(tipo, {}).get(nivel, {})
+        nombre = datos.get('nombre', f"{tipo.capitalize()} Nv.{nivel}")
         
-        if not self.usuario_registrado(usuario_id):
-            await ctx.send(f"❌ {ctx.author.mention} No estás registrado.")
-            return
+        emojis = {"muro": "🧱", "torre": "🗼", "cuartel": "🏛️"}
+        emoji = emojis.get(tipo, "🏗️")
         
-        tipo = tipo.lower()
-        if tipo not in MUROS:
-            await ctx.send(f"❌ Tipo inválido. Tipos: {', '.join(MUROS.keys())}")
-            return
+        info_texto = f"**Nivel:** {nivel}\n"
+        info_texto += f"**Construido:** {info.get('construido', 'Desconocido')[:10]}\n"
         
-        datos_usuario = self.obtener_usuario(usuario_id)
+        for key, value in datos.items():
+            if key not in ['nombre', 'emoji']:
+                emoji_stat = "❤️" if key == "hp" else "🛡️" if key == "defensa" else "⚔️" if key == "ataque" else "👥" if key == "soldados" else "📊"
+                info_texto += f"{emoji_stat} {key.capitalize()}: {value}\n"
         
-        if 'estructuras' not in datos_usuario or tipo not in datos_usuario['estructuras']:
-            await ctx.send(f"❌ No tienes un {tipo} construido. Usa `f.crear {tipo} 1`")
-            return
-        
-        nivel_actual = datos_usuario['estructuras'][tipo]['nivel']
-        nivel_siguiente = nivel_actual + 1
-        
-        if nivel_siguiente not in MUROS[tipo]:
-            nivel_max = max(MUROS[tipo].keys())
-            await ctx.send(f"❌ Ya tienes el nivel máximo para {tipo} (Nivel {nivel_max})")
-            return
-        
-        requisitos = MUROS[tipo][nivel_siguiente]
-        stats = datos_usuario['estadisticas']
-        
-        # Verificar recursos
-        errores = []
-        if stats['piedra'] < requisitos.get('piedra', 0):
-            errores.append(f"🪨 Piedra: {stats['piedra']}/{requisitos.get('piedra', 0)}")
-        if stats['madera'] < requisitos.get('madera', 0):
-            errores.append(f"🪵 Madera: {stats['madera']}/{requisitos.get('madera', 0)}")
-        if stats['oro'] < requisitos.get('oro', 0):
-            errores.append(f"🪙 Oro: {stats['oro']}/{requisitos.get('oro', 0)}")
-        
-        if errores:
-            embed = discord.Embed(
-                title="❌ RECURSOS INSUFICIENTES",
-                description=f"No tienes suficientes recursos para mejorar a **{requisitos['nombre']}**",
-                color=discord.Color.red()
-            )
-            embed.add_field(name="📊 Recursos necesarios:", value="\n".join(errores), inline=False)
-            await ctx.send(embed=embed)
-            return
-        
-        # Quitar recursos
-        stats['piedra'] -= requisitos.get('piedra', 0)
-        stats['madera'] -= requisitos.get('madera', 0)
-        stats['oro'] -= requisitos.get('oro', 0)
-        
-        # Mejorar estructura
-        datos_usuario['estructuras'][tipo]['nivel'] = nivel_siguiente
-        datos_usuario['estructuras'][tipo]['construido'] = datetime.now().isoformat()
-        self.guardar_datos()
-        
+        embed.add_field(name=f"{emoji} {nombre}", value=info_texto, inline=False)
+    
+    await ctx.send(embed=embed)
+
+@commands.command(name='mejorar')
+async def mejorar_interactivo(self, ctx, tipo: str = None):
+    """Mejora una estructura al siguiente nivel"""
+    usuario_id = ctx.author.id
+    
+    if not self.usuario_registrado(usuario_id):
+        await ctx.send(f"❌ {ctx.author.mention} No estás registrado.")
+        return
+    
+    if tipo is None:
+        # Mostrar menú de selección
         embed = discord.Embed(
-            title=f"⬆️ ¡MEJORA COMPLETADA!",
-            description=f"Has mejorado tu **{requisitos['nombre']}** al Nivel {nivel_siguiente}",
+            title="⬆️ MEJORAR ESTRUCTURA",
+            description="¿Qué estructura deseas mejorar?",
             color=discord.Color.gold()
         )
+        await ctx.send(embed=embed)
         
-        info_texto = ""
-        for key, value in requisitos.items():
-            if key not in ['nombre']:
-                emoji = "❤️" if key == "hp" else "🛡️" if key == "defensa" else "⚔️" if key == "ataque" else "👥" if key == "soldados" else "📊"
-                info_texto += f"{emoji} {key.capitalize()}: {value}\n"
+        # Mostrar estructuras disponibles
+        datos_usuario = self.obtener_usuario(usuario_id)
+        if 'estructuras' not in datos_usuario or not datos_usuario['estructuras']:
+            await ctx.send("❌ No tienes estructuras para mejorar.")
+            return
+        
+        view = View()
+        for tipo_est in datos_usuario['estructuras'].keys():
+            btn = Button(
+                label=tipo_est.capitalize(),
+                emoji="🧱" if tipo_est == "muro" else "🗼" if tipo_est == "torre" else "🏛️",
+                style=discord.ButtonStyle.primary
+            )
+            btn.callback = lambda i, t=tipo_est: self.mostrar_mejora(i, t)
+            view.add_item(btn)
+        
+        cancelar_btn = Button(label="❌ Cancelar", style=discord.ButtonStyle.red, emoji="❌")
+        cancelar_btn.callback = lambda i: self.cancelar_construccion(i)
+        view.add_item(cancelar_btn)
+        
+        await ctx.send("Selecciona la estructura a mejorar:", view=view)
+        return
+    
+    await self.procesar_mejora(ctx, tipo.lower())
+
+async def mostrar_mejora(self, interaction, tipo):
+    """Muestra la información de mejora"""
+    usuario_id = str(interaction.user.id)
+    datos_usuario = self.obtener_usuario(usuario_id)
+    
+    if tipo not in datos_usuario['estructuras']:
+        await interaction.response.send_message(f"❌ No tienes un {tipo}.", ephemeral=True)
+        return
+    
+    nivel_actual = datos_usuario['estructuras'][tipo]['nivel']
+    nivel_siguiente = nivel_actual + 1
+    
+    if nivel_siguiente not in MUROS[tipo]:
+        await interaction.response.send_message(f"⚠️ Ya tienes el nivel máximo para {tipo}.", ephemeral=True)
+        return
+    
+    datos = MUROS[tipo][nivel_siguiente]
+    
+    embed = discord.Embed(
+        title=f"⬆️ MEJORAR {datos['nombre']}",
+        description=f"Nivel actual: **{nivel_actual}** → Nivel siguiente: **{nivel_siguiente}**",
+        color=discord.Color.gold()
+    )
+    
+    info_texto = ""
+    for key, value in datos.items():
+        if key not in ['nombre', 'emoji']:
+            emoji = "❤️" if key == "hp" else "🛡️" if key == "defensa" else "⚔️" if key == "ataque" else "👥" if key == "soldados" else "📊"
+            info_texto += f"{emoji} {key.capitalize()}: {value}\n"
+    
+    embed.add_field(name="📊 Nuevas estadísticas", value=info_texto, inline=False)
+    embed.add_field(
+        name="💰 Recursos necesarios",
+        value=f"🪨 Piedra: {datos.get('piedra', 0)}\n🪵 Madera: {datos.get('madera', 0)}\n🪙 Oro: {datos.get('oro', 0)}",
+        inline=False
+    )
+    
+    view = View()
+    mejorar_btn = Button(label="✅ Confirmar Mejora", style=discord.ButtonStyle.green, emoji="✅")
+    mejorar_btn.callback = lambda i: self.construir_estructura_interactivo(i, tipo, nivel_siguiente, "mejorar")
+    view.add_item(mejorar_btn)
+    
+    cancelar_btn = Button(label="❌ Cancelar", style=discord.ButtonStyle.red, emoji="❌")
+    cancelar_btn.callback = lambda i: self.cancelar_construccion(i)
+    view.add_item(cancelar_btn)
+    
+    await interaction.response.edit_message(content="📋 Información de la mejora:", embed=embed, view=view)
+
+async def construir_estructura_interactivo(self, interaction, tipo, nivel, accion):
+    """Construye o mejora una estructura"""
+    usuario_id = str(interaction.user.id)
+    datos_usuario = self.obtener_usuario(usuario_id)
+    stats = datos_usuario['estadisticas']
+    
+    datos = MUROS[tipo][nivel]
+    
+    # Verificar recursos
+    errores = []
+    if stats['piedra'] < datos.get('piedra', 0):
+        errores.append(f"🪨 Piedra: {stats['piedra']}/{datos.get('piedra', 0)}")
+    if stats['madera'] < datos.get('madera', 0):
+        errores.append(f"🪵 Madera: {stats['madera']}/{datos.get('madera', 0)}")
+    if stats['oro'] < datos.get('oro', 0):
+        errores.append(f"🪙 Oro: {stats['oro']}/{datos.get('oro', 0)}")
+    
+    if errores:
+        embed = discord.Embed(
+            title="❌ RECURSOS INSUFICIENTES",
+            color=discord.Color.red()
+        )
+        embed.add_field(name="📊 Recursos necesarios:", value="\n".join(errores), inline=False)
+        await interaction.response.edit_message(content="❌ No tienes suficientes recursos.", embed=embed, view=None)
+        return
+    
+    # Quitar recursos
+    stats['piedra'] -= datos.get('piedra', 0)
+    stats['madera'] -= datos.get('madera', 0)
+    stats['oro'] -= datos.get('oro', 0)
+    
+    # Guardar estructura
+    if 'estructuras' not in datos_usuario:
+        datos_usuario['estructuras'] = {}
+    
+    datos_usuario['estructuras'][tipo] = {
+        'nivel': nivel,
+        'construido': datetime.now().isoformat()
+    }
+    
+    self.guardar_datos()
+    
+    # Embed de confirmación
+    embed = discord.Embed(
+        title=f"✅ ¡{'MEJORA' if accion == 'mejorar' else 'CONSTRUCCIÓN'} COMPLETADA!",
+        description=f"Has {'mejorado a' if accion == 'mejorar' else 'construido'} un **{datos['nombre']}** (Nivel {nivel})",
+        color=discord.Color.green()
+    )
+    
+    info_texto = ""
+    for key, value in datos.items():
+        if key not in ['nombre', 'emoji']:
+            emoji = "❤️" if key == "hp" else "🛡️" if key == "defensa" else "⚔️" if key == "ataque" else "👥" if key == "soldados" else "📊"
+            info_texto += f"{emoji} {key.capitalize()}: {value}\n"
+    
+    embed.add_field(name="📊 Estadísticas", value=info_texto, inline=False)
+    embed.add_field(
+        name="💰 Recursos restantes",
+        value=f"🪙 Oro: {stats['oro']}\n🪵 Madera: {stats['madera']}\n🪨 Piedra: {stats['piedra']}",
+        inline=False
+    )
+    
+    # Botón para ver estructuras
+    view = View()
+    ver_btn = Button(label="🏗️ Ver Mis Estructuras", style=discord.ButtonStyle.primary, emoji="🏗️")
+    ver_btn.callback = lambda i: self.ver_mis_estructuras(i)
+    view.add_item(ver_btn)
+    
+    await interaction.response.edit_message(content="✅ ¡Construcción completada!", embed=embed, view=view)
+
+async def ver_mis_estructuras(self, interaction):
+    """Muestra las estructuras del usuario"""
+    usuario_id = str(interaction.user.id)
+    datos_usuario = self.obtener_usuario(usuario_id)
+    
+    embed = discord.Embed(
+        title=f"🏗️ TUS ESTRUCTURAS",
+        color=discord.Color.blue()
+    )
+    
+    if 'estructuras' not in datos_usuario or not datos_usuario['estructuras']:
+        embed.description = "❌ No tienes estructuras construidas"
+        await interaction.response.edit_message(content="📋", embed=embed, view=None)
+        return
+    
+    for tipo, info in datos_usuario['estructuras'].items():
+        nivel = info['nivel']
+        datos = MUROS.get(tipo, {}).get(nivel, {})
+        nombre = datos.get('nombre', f"{tipo.capitalize()} Nv.{nivel}")
+        
+        emojis = {"muro": "🧱", "torre": "🗼", "cuartel": "🏛️"}
+        emoji = emojis.get(tipo, "🏗️")
         
         embed.add_field(
-            name="📊 Nuevas estadísticas",
-            value=info_texto,
+            name=f"{emoji} {nombre}",
+            value=f"📊 Nivel: {nivel}\n📅 Construido: {info.get('construido', '')[:10]}",
             inline=False
         )
-        
-        embed.set_footer(text=f"ID: {usuario_id}")
-        await ctx.send(embed=embed)
+    
+    await interaction.response.edit_message(content="📋", embed=embed, view=None)
+
+async def cancelar_construccion(self, interaction):
+    """Cancela la construcción"""
+    await interaction.response.edit_message(
+        content="❌ Construcción cancelada.",
+        embed=None,
+        view=None
+    )
+
+async def procesar_mejora(self, ctx, tipo):
+    """Procesa la mejora de una estructura"""
+    usuario_id = str(ctx.author.id)
+    datos_usuario = self.obtener_usuario(usuario_id)
+    
+    if tipo not in datos_usuario['estructuras']:
+        await ctx.send(f"❌ No tienes un {tipo}.")
+        return
+    
+    nivel_actual = datos_usuario['estructuras'][tipo]['nivel']
+    nivel_siguiente = nivel_actual + 1
+    
+    if nivel_siguiente not in MUROS[tipo]:
+        await ctx.send(f"⚠️ Ya tienes el nivel máximo para {tipo}.")
+        return
+    
+    datos = MUROS[tipo][nivel_siguiente]
+    stats = datos_usuario['estadisticas']
+    
+    # Verificar recursos
+    if stats['piedra'] < datos.get('piedra', 0) or \
+       stats['madera'] < datos.get('madera', 0) or \
+       stats['oro'] < datos.get('oro', 0):
+        await ctx.send(f"❌ No tienes suficientes recursos para mejorar a **{datos['nombre']}**")
+        return
+    
+    # Quitar recursos
+    stats['piedra'] -= datos.get('piedra', 0)
+    stats['madera'] -= datos.get('madera', 0)
+    stats['oro'] -= datos.get('oro', 0)
+    
+    # Mejorar
+    datos_usuario['estructuras'][tipo]['nivel'] = nivel_siguiente
+    datos_usuario['estructuras'][tipo]['construido'] = datetime.now().isoformat()
+    self.guardar_datos()
+    
+    await ctx.send(f"✅ ¡Has mejorado tu **{datos['nombre']}** al Nivel {nivel_siguiente}!")
 
 #====================================FIN DE LA CREACION DE MUROS=============================================
 
