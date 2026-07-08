@@ -1,0 +1,45 @@
+{
+    "usuarios": {
+        "567499430190776340": {
+            "nombre": "Aru",
+            "fecha_registro": "2026-07-02T20:41:50.134454",
+            "nivel": 1,
+            "estadisticas": {
+                "hp": 100,
+                "oro": 100,
+                "madera": 0,
+                "piedra": 0,
+                "poblacion": 0,
+                "soldados": 0
+            },
+            "edificaciones": {
+                "casa": 0,
+                "muralia": 0,
+                "cuartel": 0
+            },
+            "experiencia": 0
+        },
+        "647588351553306686": {
+            "nombre": "Mudae",
+            "fecha_registro": "2026-07-02T20:54:29.353481",
+            "nivel": 1,
+            "estadisticas": {
+                "hp": 100,
+                "oro": 0,
+                "madera": 0,
+                "piedra": 200,
+                "poblacion": 0,
+                "soldados": 0
+            },
+            "edificaciones": {
+                "casa": 0,
+                "muralia": 0,
+                "cuartel": 0
+            },
+            "experiencia": 0
+        }
+    },
+    "estadisticas": {
+        "total_registrados": 2
+    }
+}
