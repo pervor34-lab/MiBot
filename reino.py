@@ -3,7 +3,7 @@ from discord.ext import commands
 from discord.ui import Button, View, Select
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ============ CONFIGURACIÓN DE MUROS ============
 MUROS = {
@@ -468,6 +468,64 @@ async def ver_recompensa(self, ctx):
     )
     
     embed.set_footer(text="¡Reclama tu recompensa cada semana!")
+    await ctx.send(embed=embed)
+
+#======================LVL UP===============
+@commands.command(name='subirnivel')
+@commands.has_permissions(administrator=True)
+async def subir_nivel(self, ctx, miembro: discord.Member, nuevo_nivel: int = None):
+    """Sube de nivel a un usuario (solo admin)"""
+    usuario_id = str(miembro.id)
+    
+    if not self.usuario_registrado(usuario_id):
+        await ctx.send(f"❌ {miembro.mention} no está registrado.")
+        return
+    
+    datos_usuario = self.obtener_usuario(usuario_id)
+    
+    if nuevo_nivel is None:
+        # Subir 1 nivel
+        nuevo_nivel = datos_usuario['nivel'] + 1
+    else:
+        if nuevo_nivel < 1:
+            await ctx.send(f"❌ El nivel no puede ser menor a 1.")
+            return
+    
+    nivel_maximo = max(RECOMPENSAS_SEMANALES.keys())
+    if nuevo_nivel > nivel_maximo:
+        await ctx.send(f"⚠️ El nivel máximo es {nivel_maximo}.")
+        return
+    
+    # Actualizar nivel
+    nivel_anterior = datos_usuario['nivel']
+    datos_usuario['nivel'] = nuevo_nivel
+    self.guardar_datos()
+    
+    embed = discord.Embed(
+        title="⬆️ ¡NIVEL ACTUALIZADO!",
+        description=f"{miembro.mention} ha subido de nivel",
+        color=discord.Color.gold()
+    )
+    
+    embed.add_field(
+        name="📊 Progreso",
+        value=f"**Nivel anterior:** {nivel_anterior}\n"
+              f"**Nuevo nivel:** {nuevo_nivel}",
+        inline=False
+    )
+    
+    # Mostrar nueva recompensa
+    if nuevo_nivel in RECOMPENSAS_SEMANALES:
+        recompensa = RECOMPENSAS_SEMANALES[nuevo_nivel]
+        embed.add_field(
+            name="💰 Nueva recompensa semanal",
+            value=f"**{recompensa['nombre']}**\n"
+                  f"🪙 {recompensa['oro']} Oro\n"
+                  f"🪵 {recompensa['madera']} Madera\n"
+                  f"🪨 {recompensa['piedra']} Piedra",
+            inline=False
+        )
+    
     await ctx.send(embed=embed)
 #=================STAT====================
     @commands.command(name='stat')
