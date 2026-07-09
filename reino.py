@@ -743,4 +743,333 @@ class SistemaReinos(commands.Cog):
                 description="Selecciona la estructura a mejorar:",
                 color=discord.Color.gold()
             )
-           
+            await ctx.send(embed=embed)
+            
+            view = View()
+            for tipo_est in datos_usuario['estructuras'].keys():
+                btn = Button(
+                    label=tipo_est.capitalize(),
+                    emoji="🧱" if tipo_est == "muro" else "🗼" if tipo_est == "torre" else "🏛️",
+                    style=discord.ButtonStyle.primary
+                )
+                btn.callback = lambda i, t=tipo_est: self.mostrar_mejora(i, t)
+                view.add_item(btn)
+            
+            cancelar_btn = Button(label="❌ Cancelar", style=discord.ButtonStyle.red, emoji="❌")
+            cancelar_btn.callback = lambda i: self.cancelar_construccion(i)
+            view.add_item(cancelar_btn)
+            
+            await ctx.send("Selecciona la estructura a mejorar:", view=view)
+            return
+        
+        await self.procesar_mejora(ctx, tipo.lower())
+
+    # ============ MÉTODOS AUXILIARES PARA CONSTRUCCIÓN ============
+    
+    async def mostrar_mejora(self, interaction, tipo):
+        """Muestra la información de mejora"""
+        usuario_id = str(interaction.user.id)
+        datos_usuario = self.obtener_usuario(usuario_id)
+        
+        if tipo not in datos_usuario['estructuras']:
+            await interaction.response.send_message(f"❌ No tienes un {tipo}.", ephemeral=True)
+            return
+        
+        nivel_actual = datos_usuario['estructuras'][tipo]['nivel']
+        nivel_siguiente = nivel_actual + 1
+        
+        if nivel_siguiente not in MUROS[tipo]:
+            await interaction.response.send_message(f"⚠️ Ya tienes el nivel máximo para {tipo}.", ephemeral=True)
+            return
+        
+        datos = MUROS[tipo][nivel_siguiente]
+        
+        embed = discord.Embed(
+            title=f"⬆️ MEJORAR {datos['nombre']}",
+            description=f"Nivel actual: **{nivel_actual}** → Nivel siguiente: **{nivel_siguiente}**",
+            color=discord.Color.gold()
+        )
+        
+        info_texto = ""
+        for key, value in datos.items():
+            if key not in ['nombre', 'emoji']:
+                emoji = "❤️" if key == "hp" else "🛡️" if key == "defensa" else "⚔️" if key == "ataque" else "👥" if key == "soldados" else "📊"
+                info_texto += f"{emoji} {key.capitalize()}: {value}\n"
+        
+        embed.add_field(name="📊 Nuevas estadísticas", value=info_texto, inline=False)
+        embed.add_field(
+            name="💰 Recursos necesarios",
+            value=f"🪨 Piedra: {datos.get('piedra', 0)}\n🪵 Madera: {datos.get('madera', 0)}\n🪙 Oro: {datos.get('oro', 0)}",
+            inline=False
+        )
+        
+        view = View()
+        mejorar_btn = Button(label="✅ Confirmar Mejora", style=discord.ButtonStyle.green, emoji="✅")
+        mejorar_btn.callback = lambda i: self.construir_estructura_interactivo(i, tipo, nivel_siguiente, "mejorar")
+        view.add_item(mejorar_btn)
+        
+        cancelar_btn = Button(label="❌ Cancelar", style=discord.ButtonStyle.red, emoji="❌")
+        cancelar_btn.callback = lambda i: self.cancelar_construccion(i)
+        view.add_item(cancelar_btn)
+        
+        await interaction.response.edit_message(content="📋 Información de la mejora:", embed=embed, view=view)
+
+    async def construir_estructura_interactivo(self, interaction, tipo, nivel, accion):
+        """Construye o mejora una estructura"""
+        usuario_id = str(interaction.user.id)
+        datos_usuario = self.obtener_usuario(usuario_id)
+        stats = datos_usuario['estadisticas']
+        
+        datos = MUROS[tipo][nivel]
+        
+        # Verificar recursos
+        errores = []
+        if stats['piedra'] < datos.get('piedra', 0):
+            errores.append(f"🪨 Piedra: {stats['piedra']}/{datos.get('piedra', 0)}")
+        if stats['madera'] < datos.get('madera', 0):
+            errores.append(f"🪵 Madera: {stats['madera']}/{datos.get('madera', 0)}")
+        if stats['oro'] < datos.get('oro', 0):
+            errores.append(f"🪙 Oro: {stats['oro']}/{datos.get('oro', 0)}")
+        
+        if errores:
+            embed = discord.Embed(
+                title="❌ RECURSOS INSUFICIENTES",
+                color=discord.Color.red()
+            )
+            embed.add_field(name="📊 Recursos necesarios:", value="\n".join(errores), inline=False)
+            await interaction.response.edit_message(content="❌ No tienes suficientes recursos.", embed=embed, view=None)
+            return
+        
+        # Quitar recursos
+        stats['piedra'] -= datos.get('piedra', 0)
+        stats['madera'] -= datos.get('madera', 0)
+        stats['oro'] -= datos.get('oro', 0)
+        
+        # Guardar estructura
+        if 'estructuras' not in datos_usuario:
+            datos_usuario['estructuras'] = {}
+        
+        datos_usuario['estructuras'][tipo] = {
+            'nivel': nivel,
+            'construido': datetime.now().isoformat()
+        }
+        
+        self.guardar_datos()
+        
+        embed = discord.Embed(
+            title=f"✅ ¡{'MEJORA' if accion == 'mejorar' else 'CONSTRUCCIÓN'} COMPLETADA!",
+            description=f"Has {'mejorado a' if accion == 'mejorar' else 'construido'} un **{datos['nombre']}** (Nivel {nivel})",
+            color=discord.Color.green()
+        )
+        
+        info_texto = ""
+        for key, value in datos.items():
+            if key not in ['nombre', 'emoji']:
+                emoji = "❤️" if key == "hp" else "🛡️" if key == "defensa" else "⚔️" if key == "ataque" else "👥" if key == "soldados" else "📊"
+                info_texto += f"{emoji} {key.capitalize()}: {value}\n"
+        
+        embed.add_field(name="📊 Estadísticas", value=info_texto, inline=False)
+        embed.add_field(
+            name="💰 Recursos restantes",
+            value=f"🪙 Oro: {stats['oro']}\n🪵 Madera: {stats['madera']}\n🪨 Piedra: {stats['piedra']}",
+            inline=False
+        )
+        
+        view = View()
+        ver_btn = Button(label="🏗️ Ver Mis Estructuras", style=discord.ButtonStyle.primary, emoji="🏗️")
+        ver_btn.callback = lambda i: self.ver_mis_estructuras(i)
+        view.add_item(ver_btn)
+        
+        await interaction.response.edit_message(content="✅ ¡Construcción completada!", embed=embed, view=view)
+
+    async def ver_mis_estructuras(self, interaction):
+        """Muestra las estructuras del usuario"""
+        usuario_id = str(interaction.user.id)
+        datos_usuario = self.obtener_usuario(usuario_id)
+        
+        embed = discord.Embed(
+            title=f"🏗️ TUS ESTRUCTURAS",
+            color=discord.Color.blue()
+        )
+        
+        if 'estructuras' not in datos_usuario or not datos_usuario['estructuras']:
+            embed.description = "❌ No tienes estructuras construidas"
+            await interaction.response.edit_message(content="📋", embed=embed, view=None)
+            return
+        
+        for tipo, info in datos_usuario['estructuras'].items():
+            nivel = info['nivel']
+            datos = MUROS.get(tipo, {}).get(nivel, {})
+            nombre = datos.get('nombre', f"{tipo.capitalize()} Nv.{nivel}")
+            
+            emojis = {"muro": "🧱", "torre": "🗼", "cuartel": "🏛️"}
+            emoji = emojis.get(tipo, "🏗️")
+            
+            embed.add_field(
+                name=f"{emoji} {nombre}",
+                value=f"📊 Nivel: {nivel}\n📅 Construido: {info.get('construido', '')[:10]}",
+                inline=False
+            )
+        
+        await interaction.response.edit_message(content="📋", embed=embed, view=None)
+
+    async def cancelar_construccion(self, interaction):
+        """Cancela la construcción"""
+        await interaction.response.edit_message(
+            content="❌ Construcción cancelada.",
+            embed=None,
+            view=None
+        )
+
+    async def procesar_mejora(self, ctx, tipo):
+        """Procesa la mejora de una estructura"""
+        usuario_id = str(ctx.author.id)
+        datos_usuario = self.obtener_usuario(usuario_id)
+        
+        if tipo not in datos_usuario['estructuras']:
+            await ctx.send(f"❌ No tienes un {tipo}.")
+            return
+        
+        nivel_actual = datos_usuario['estructuras'][tipo]['nivel']
+        nivel_siguiente = nivel_actual + 1
+        
+        if nivel_siguiente not in MUROS[tipo]:
+            await ctx.send(f"⚠️ Ya tienes el nivel máximo para {tipo}.")
+            return
+        
+        datos = MUROS[tipo][nivel_siguiente]
+        stats = datos_usuario['estadisticas']
+        
+        if stats['piedra'] < datos.get('piedra', 0) or \
+           stats['madera'] < datos.get('madera', 0) or \
+           stats['oro'] < datos.get('oro', 0):
+            await ctx.send(f"❌ No tienes suficientes recursos para mejorar a **{datos['nombre']}**")
+            return
+        
+        stats['piedra'] -= datos.get('piedra', 0)
+        stats['madera'] -= datos.get('madera', 0)
+        stats['oro'] -= datos.get('oro', 0)
+        
+        datos_usuario['estructuras'][tipo]['nivel'] = nivel_siguiente
+        datos_usuario['estructuras'][tipo]['construido'] = datetime.now().isoformat()
+        self.guardar_datos()
+        
+        await ctx.send(f"✅ ¡Has mejorado tu **{datos['nombre']}** al Nivel {nivel_siguiente}!")
+
+    # ============ COMANDOS DE ADMINISTRACIÓN DE RECURSOS ============
+    
+    @commands.command(name='addoro')
+    @commands.has_permissions(administrator=True)
+    async def agregar_oro(self, ctx, miembro: discord.Member, cantidad: int):
+        """Agrega oro a un usuario (solo admin)"""
+        usuario_id = str(miembro.id)
+        
+        if not self.usuario_registrado(usuario_id):
+            await ctx.send(f"❌ {miembro.mention} no está registrado en el sistema.")
+            return
+        
+        self.datos["usuarios"][usuario_id]["estadisticas"]["oro"] += cantidad
+        self.guardar_datos()
+        
+        await ctx.send(f"✅ Se agregaron **{cantidad}** 🪙 de oro a {miembro.mention}")
+
+    @commands.command(name='setoro')
+    @commands.has_permissions(administrator=True)
+    async def set_oro(self, ctx, miembro: discord.Member, cantidad: int):
+        """Establece el oro de un usuario (solo admin)"""
+        usuario_id = str(miembro.id)
+        
+        if not self.usuario_registrado(usuario_id):
+            await ctx.send(f"❌ {miembro.mention} no está registrado.")
+            return
+        
+        if cantidad < 0:
+            await ctx.send(f"❌ La cantidad no puede ser negativa.")
+            return
+        
+        self.datos["usuarios"][usuario_id]["estadisticas"]["oro"] = cantidad
+        self.guardar_datos()
+        
+        embed = discord.Embed(
+            title="💰 ORO ACTUALIZADO",
+            description=f"El oro de {miembro.mention} ahora es **{cantidad}** 🪙",
+            color=discord.Color.gold()
+        )
+        await ctx.send(embed=embed)
+
+    @commands.command(name='setmadera')
+    @commands.has_permissions(administrator=True)
+    async def set_madera(self, ctx, miembro: discord.Member, cantidad: int):
+        """Establece la madera de un usuario (solo admin)"""
+        usuario_id = str(miembro.id)
+        
+        if not self.usuario_registrado(usuario_id):
+            await ctx.send(f"❌ {miembro.mention} no está registrado.")
+            return
+        
+        if cantidad < 0:
+            await ctx.send(f"❌ La cantidad no puede ser negativa.")
+            return
+        
+        self.datos["usuarios"][usuario_id]["estadisticas"]["madera"] = cantidad
+        self.guardar_datos()
+        
+        await ctx.send(f"✅ La madera de {miembro.mention} ahora es **{cantidad}** 🪵")
+
+    @commands.command(name='setpiedra')
+    @commands.has_permissions(administrator=True)
+    async def set_piedra(self, ctx, miembro: discord.Member, cantidad: int):
+        """Establece la piedra de un usuario (solo admin)"""
+        usuario_id = str(miembro.id)
+        
+        if not self.usuario_registrado(usuario_id):
+            await ctx.send(f"❌ {miembro.mention} no está registrado.")
+            return
+        
+        if cantidad < 0:
+            await ctx.send(f"❌ La cantidad no puede ser negativa.")
+            return
+        
+        self.datos["usuarios"][usuario_id]["estadisticas"]["piedra"] = cantidad
+        self.guardar_datos()
+        
+        await ctx.send(f"✅ La piedra de {miembro.mention} ahora es **{cantidad}** 🪨")
+
+    @commands.command(name='sethp')
+    @commands.has_permissions(administrator=True)
+    async def set_hp(self, ctx, miembro: discord.Member, cantidad: int):
+        """Establece el HP de un usuario (solo admin)"""
+        usuario_id = str(miembro.id)
+        
+        if not self.usuario_registrado(usuario_id):
+            await ctx.send(f"❌ {miembro.mention} no está registrado.")
+            return
+        
+        if cantidad < 0:
+            await ctx.send(f"❌ La cantidad no puede ser negativa.")
+            return
+        
+        self.datos["usuarios"][usuario_id]["estadisticas"]["hp"] = cantidad
+        self.guardar_datos()
+        
+        await ctx.send(f"✅ El HP de {miembro.mention} ahora es **{cantidad}** ❤️")
+
+    @commands.command(name='borrarusuario')
+    @commands.has_permissions(administrator=True)
+    async def borrar_usuario(self, ctx, miembro: discord.Member):
+        """Borra a un usuario del sistema (solo admin)"""
+        usuario_id = str(miembro.id)
+        
+        if not self.usuario_registrado(usuario_id):
+            await ctx.send(f"❌ {miembro.mention} no está registrado en el sistema.")
+            return
+        
+        del self.datos["usuarios"][usuario_id]
+        self.datos["estadisticas"]["total_registrados"] -= 1
+        self.guardar_datos()
+        
+        await ctx.send(f"✅ {miembro.mention} ha sido eliminado del sistema de reinos.")
+
+# ============ SETUP ============
+async def setup(bot):
+    await bot.add_cog(SistemaReinos(bot))
