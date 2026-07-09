@@ -27,6 +27,9 @@ class InteraccionesCommands(commands.Cog):
                 "gif/lick/lick2.gif",
                 "gif/lick/lick3.gif",
                 "gif/lick/lick4.gif"
+            ],
+            "disgust":[
+                "gif/disgust/disgust_bot.gif"
             ]
         }
     
@@ -159,13 +162,13 @@ class InteraccionesCommands(commands.Cog):
         # Caso 3: Das lick al bot
         if miembro.id == self.bot.user.id:
             gif_path = random.choice(self.gifs["disgust"])
-            file = discord.File(gif_path, filename="disgust.gif")
+            file = discord.File(gif_path, filename="disgust_bot.gif")
             
             embed = discord.Embed(
                 description=f"**{ctx.author.mention}** No me toques... asqueroso",
                 color=discord.Color.pink()
             )
-            embed.set_image(url="attachment://disgust.gif")
+            embed.set_image(url="attachment://disgust_bot.gif")
             
             await ctx.send(file=file, embed=embed)
             return  # ✅ IMPORTANTE: Detener la ejecución aquí
