@@ -143,7 +143,7 @@ class InteraccionesCommands(commands.Cog):
             file = discord.File(gif_path, filename="lick.gif")
             
             embed = discord.Embed(
-                description=f"**quieres que te lama?... bien.. toma~  {ctx.author.mention}** 🤗",
+                description=f"**quieres que te lama?... bien.. toma~  {ctx.author.mention}** ",
                 color=discord.Color.pink()
             )
             embed.set_image(url="attachment://lick.gif")
@@ -158,8 +158,8 @@ class InteraccionesCommands(commands.Cog):
         
         # Caso 3: Das lick al bot
         if miembro.id == self.bot.user.id:
-            gif_path = random.choice(self.gifs["lick"])
-            file = discord.File(gif_path, filename="lick.gif")
+            gif_path = random.choice(self.gifs["disgust"])
+            file = discord.File(gif_path, filename="disgust.gif")
             
             embed = discord.Embed(
                 description=f"**{ctx.author.mention}** No me toques... asqueroso",
