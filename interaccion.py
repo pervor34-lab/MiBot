@@ -20,7 +20,13 @@ class InteraccionesCommands(commands.Cog):
             ],
             "pat":[
                 "gif/pat/pat1.gif",
-                "gif/pat/pat2.gif",
+                "gif/pat/pat2.gif"
+            ],
+            "lick":[
+                "gif/lick/lick1.gif",
+                "gif/lick/lick2.gif",
+                "gif/lick/lick3.gif",
+                "gif/lick/lick4.gif"
             ]
         }
     
@@ -122,6 +128,57 @@ class InteraccionesCommands(commands.Cog):
             color=discord.Color.green()
         )
         embed.set_image(url="attachment://pat.gif")
+        
+        await ctx.send(file=file, embed=embed)
+        # No es necesario return aquí porque ya es el final
+
+    #PARA LICK
+    @commands.command(name='lick')
+    async def lick(self, ctx, miembro: discord.Member = None):
+        # Caso 1: Sin mención - el bot da lick
+        if miembro is None:
+            miembro = ctx.guild.me
+        
+            gif_path = random.choice(self.gifs["lick"])
+            file = discord.File(gif_path, filename="lick.gif")
+            
+            embed = discord.Embed(
+                description=f"**quieres que te lama?... bien.. toma~  {ctx.author.mention}** 🤗",
+                color=discord.Color.pink()
+            )
+            embed.set_image(url="attachment://lick.gif")
+            
+            await ctx.send(file=file, embed=embed)
+            return  # ✅ IMPORTANTE: Detener la ejecución aquí
+        
+        # Caso 2: Te das lick a ti mismo
+        if miembro.id == ctx.author.id:
+            await ctx.send("no te lamas a ti mismo... raro..")
+            return  # ✅ IMPORTANTE: Detener la ejecución aquí
+        
+        # Caso 3: Das lick al bot
+        if miembro.id == self.bot.user.id:
+            gif_path = random.choice(self.gifs["lick"])
+            file = discord.File(gif_path, filename="lick.gif")
+            
+            embed = discord.Embed(
+                description=f"**{ctx.author.mention}** No me toques... asqueroso",
+                color=discord.Color.pink()
+            )
+            embed.set_image(url="attachment://disgust.gif")
+            
+            await ctx.send(file=file, embed=embed)
+            return  # ✅ IMPORTANTE: Detener la ejecución aquí
+        
+        # Caso 4: lick normal entre usuarios
+        gif_path = random.choice(self.gifs["lick"])
+        file = discord.File(gif_path, filename="lick.gif")
+        
+        embed = discord.Embed(
+            description=f"**{ctx.author.mention}** lamiste a  **{miembro.mention}** ",
+            color=discord.Color.green()
+        )
+        embed.set_image(url="attachment://lick.gif")
         
         await ctx.send(file=file, embed=embed)
         # No es necesario return aquí porque ya es el final
