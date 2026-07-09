@@ -168,7 +168,7 @@ class InteraccionesCommands(commands.Cog):
                 description=f"**{ctx.author.mention}** No me toques... asqueroso",
                 color=discord.Color.pink()
             )
-            embed.set_image(url="attachment://disgust_bot.gif")
+            embed.set_image(url="attachment://disgust.gif")
             
             await ctx.send(file=file, embed=embed)
             return  # ✅ IMPORTANTE: Detener la ejecución aquí

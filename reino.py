@@ -28,6 +28,16 @@ MUROS = {
     }
 }
 
+# ============ CONFIGURACIÓN DE RECOMPENSAS SEMANALES ============
+RECOMPENSAS_SEMANALES = {
+    1: {"oro": 8000, "madera": 100, "piedra": 50, "nombre": "Novato"},
+    2: {"oro": 12000, "madera": 200, "piedra": 100, "nombre": "Aprendiz"},
+    3: {"oro": 18000, "madera": 350, "piedra": 200, "nombre": "Guerrero"},
+    4: {"oro": 25000, "madera": 500, "piedra": 350, "nombre": "Señor"},
+    5: {"oro": 35000, "madera": 750, "piedra": 500, "nombre": "Barón"},
+    6: {"oro": 50000, "madera": 1000, "piedra": 750, "nombre": "Conde"}
+}
+
 # ============ CLASES DE VISTAS (FUERA DE LA CLASE COG) ============
 class SeleccionEstructura(discord.ui.View):
     def __init__(self, cog, usuario_id):
@@ -215,45 +225,251 @@ class SistemaReinos(commands.Cog):
     # ============ COMANDOS DE USUARIO ============
     
     @commands.command(name='registrar')
-    async def registrar(self, ctx):
-        """Registra a un usuario en el sistema de reinos"""
-        usuario_id = ctx.author.id
+    def registrar_usuario(self, user_id, nombre):
+        """Registra un nuevo usuario"""
+        user_id_str = str(user_id)
+        if user_id_str in self.datos["usuarios"]:
+            return False, "Ya estás registrado en el sistema de reinos."
         
-        if self.usuario_registrado(usuario_id):
-            await ctx.send(f"❌ {ctx.author.mention} ¡Ya estás registrado en el sistema de reinos!")
-            return
+        self.datos["usuarios"][user_id_str] = {
+            "nombre": nombre,
+            "fecha_registro": datetime.now().isoformat(),
+            "nivel": 1,
+            "experiencia": 0,
+            "estadisticas": {
+                "hp": 100,
+                "oro": 0,
+                "madera": 0,
+                "piedra": 0,
+                "poblacion": 0,
+                "soldados": 0
+            },
+            "edificaciones": {"casa": 0, "muralia": 0, "cuartel": 0},
+            "estructuras": {},
+            # ============ NUEVO: Sistema de recompensas semanales ============
+            "recompensa_semanal": {
+                "ultima_vez": None,  # Fecha de la última recompensa
+                "dias_restantes": 7  # Días hasta la próxima recompensa
+            }
+        }
         
-        exito, mensaje = self.registrar_usuario(usuario_id, ctx.author.display_name)
-        
-        if exito:
-            embed = discord.Embed(
-                title="🏰 ¡BIENVENIDO AL SISTEMA DE REINOS!",
-                description=f"{ctx.author.mention} {mensaje}",
-                color=discord.Color.green()
-            )
+        self.datos["estadisticas"]["total_registrados"] += 1
+        self.guardar_datos()
+        return True, "¡Registro exitoso! Ahora eres parte del sistema de reinos."
+#============COMANDO PARA RECLAMAR======================
+@commands.command(name='reclamar')
+async def reclamar_recompensa(self, ctx):
+    """Reclama tu recompensa semanal basada en tu nivel"""
+    usuario_id = str(ctx.author.id)
+    
+    if not self.usuario_registrado(usuario_id):
+        embed = discord.Embed(
+            title="❌ NO REGISTRADO",
+            description=f"{ctx.author.mention} No estás registrado. Usa `f.registrar`",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
+        return
+    
+    datos_usuario = self.obtener_usuario(usuario_id)
+    nivel = datos_usuario['nivel']
+    
+    # Verificar el nivel máximo disponible
+    nivel_maximo = max(RECOMPENSAS_SEMANALES.keys())
+    if nivel > nivel_maximo:
+        nivel = nivel_maximo
+    
+    # Obtener la recompensa según el nivel
+    recompensa = RECOMPENSAS_SEMANALES.get(nivel, RECOMPENSAS_SEMANALES[1])
+    
+    # Verificar si ya reclamó esta semana
+    ultima_vez = datos_usuario.get('recompensa_semanal', {}).get('ultima_vez')
+    hoy = datetime.now()
+    
+    if ultima_vez:
+        try:
+            ultima_fecha = datetime.fromisoformat(ultima_vez)
+            dias_pasados = (hoy - ultima_fecha).days
             
-            datos_usuario = self.obtener_usuario(usuario_id)
+            if dias_pasados < 7:
+                dias_restantes = 7 - dias_pasados
+                proxima = ultima_fecha + timedelta(days=7)
+                
+                embed = discord.Embed(
+                    title="⏳ YA RECLAMASTE TU RECOMPENSA",
+                    description=f"{ctx.author.mention} Ya reclamaste tu recompensa esta semana.",
+                    color=discord.Color.orange()
+                )
+                embed.add_field(
+                    name="📅 Próxima recompensa disponible",
+                    value=f"⏰ **{dias_restantes} días** restantes\n"
+                          f"📆 {proxima.strftime('%d/%m/%Y')}",
+                    inline=False
+                )
+                embed.add_field(
+                    name="💰 Recompensa para tu nivel",
+                    value=f"**Nivel {nivel}** - {recompensa['nombre']}\n"
+                          f"🪙 Oro: {recompensa['oro']}\n"
+                          f"🪵 Madera: {recompensa['madera']}\n"
+                          f"🪨 Piedra: {recompensa['piedra']}",
+                    inline=False
+                )
+                embed.set_footer(text="¡Vuelve la próxima semana!")
+                await ctx.send(embed=embed)
+                return
+        except:
+            pass
+    
+    # ============ ENTREGAR RECOMPENSA ============
+    stats = datos_usuario['estadisticas']
+    
+    # Agregar recursos
+    stats['oro'] += recompensa['oro']
+    stats['madera'] += recompensa['madera']
+    stats['piedra'] += recompensa['piedra']
+    
+    # Actualizar última recompensa
+    if 'recompensa_semanal' not in datos_usuario:
+        datos_usuario['recompensa_semanal'] = {}
+    
+    datos_usuario['recompensa_semanal']['ultima_vez'] = hoy.isoformat()
+    self.guardar_datos()
+    
+    # Embed de confirmación
+    embed = discord.Embed(
+        title="🎉 ¡RECOMPENSA SEMANAL RECLAMADA!",
+        description=f"{ctx.author.mention} Has reclamado tu recompensa de esta semana.",
+        color=discord.Color.green()
+    )
+    
+    embed.add_field(
+        name="📊 Recompensa recibida",
+        value=f"**Nivel {nivel}** - {recompensa['nombre']}\n"
+              f"🪙 **+{recompensa['oro']}** Oro\n"
+              f"🪵 **+{recompensa['madera']}** Madera\n"
+              f"🪨 **+{recompensa['piedra']}** Piedra",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="💰 Tus recursos actuales",
+        value=f"🪙 **{stats['oro']}** Oro\n"
+              f"🪵 **{stats['madera']}** Madera\n"
+              f"🪨 **{stats['piedra']}** Piedra",
+        inline=False
+    )
+    
+    proxima_recompensa = hoy + timedelta(days=7)
+    embed.add_field(
+        name="📅 Próxima recompensa",
+        value=f"📆 Disponible el: {proxima_recompensa.strftime('%d/%m/%Y')}\n"
+              f"⏰ En 7 días",
+        inline=False
+    )
+    
+    embed.set_footer(text="¡Vuelve la próxima semana por más recompensas!")
+    await ctx.send(embed=embed)
+
+
+@commands.command(name='recompensa')
+async def ver_recompensa(self, ctx):
+    """Muestra el estado de tu recompensa semanal"""
+    usuario_id = str(ctx.author.id)
+    
+    if not self.usuario_registrado(usuario_id):
+        await ctx.send(f"❌ {ctx.author.mention} No estás registrado. Usa `f.registrar`")
+        return
+    
+    datos_usuario = self.obtener_usuario(usuario_id)
+    nivel = datos_usuario['nivel']
+    nivel_maximo = max(RECOMPENSAS_SEMANALES.keys())
+    
+    if nivel > nivel_maximo:
+        nivel = nivel_maximo
+    
+    recompensa = RECOMPENSAS_SEMANALES.get(nivel, RECOMPENSAS_SEMANALES[1])
+    
+    embed = discord.Embed(
+        title="📊 ESTADO DE RECOMPENSA SEMANAL",
+        description=f"Información para {ctx.author.display_name}",
+        color=discord.Color.blue()
+    )
+    
+    # Nivel actual
+    embed.add_field(
+        name="📈 Tu nivel",
+        value=f"**Nivel {nivel}** - {recompensa['nombre']}",
+        inline=False
+    )
+    
+    # Recompensa disponible
+    embed.add_field(
+        name="💰 Recompensa disponible",
+        value=f"🪙 **{recompensa['oro']}** Oro\n"
+              f"🪵 **{recompensa['madera']}** Madera\n"
+              f"🪨 **{recompensa['piedra']}** Piedra",
+        inline=False
+    )
+    
+    # Verificar si ya reclamó
+    ultima_vez = datos_usuario.get('recompensa_semanal', {}).get('ultima_vez')
+    hoy = datetime.now()
+    
+    if ultima_vez:
+        try:
+            ultima_fecha = datetime.fromisoformat(ultima_vez)
+            dias_pasados = (hoy - ultima_fecha).days
             
+            if dias_pasados < 7:
+                dias_restantes = 7 - dias_pasados
+                embed.add_field(
+                    name="⏳ Estado",
+                    value=f"❌ **Ya reclamaste** esta semana\n"
+                          f"⏰ Próxima en: **{dias_restantes} días**",
+                    inline=False
+                )
+                embed.color = discord.Color.orange()
+            else:
+                embed.add_field(
+                    name="✅ Estado",
+                    value=f"🎉 **¡Recompensa disponible!**\n"
+                          f"Usa `f.reclamar` para recibirla",
+                    inline=False
+                )
+                embed.color = discord.Color.green()
+        except:
             embed.add_field(
-                name="📊 Tus estadísticas iniciales",
-                value=f"**Nivel:** {datos_usuario['nivel']}\n"
-                      f"**HP:** ❤️ {datos_usuario['estadisticas']['hp']}\n"
-                      f"**Oro:** 🪙 {datos_usuario['estadisticas']['oro']}\n"
-                      f"**Fecha de registro:** {datos_usuario['fecha_registro'][:10]}",
+                name="✅ Estado",
+                value=f"🎉 **¡Recompensa disponible!**\n"
+                      f"Usa `f.reclamar` para recibirla",
                 inline=False
             )
-            
-            try:
-                archivo = discord.File("imagen/Reino/reino default.jpg", filename="fondo.jpg")
-                embed.set_image(url="attachment://fondo.jpg")
-                embed.set_footer(text="¡Usa f.stat para ver tus estadísticas completas!")
-                await ctx.send(file=archivo, embed=embed)
-            except:
-                embed.set_footer(text="¡Usa f.stat para ver tus estadísticas completas!")
-                await ctx.send(embed=embed)
-        else:
-            await ctx.send(f"❌ Error al registrar: {mensaje}")
-
+            embed.color = discord.Color.green()
+    else:
+        embed.add_field(
+            name="✅ Estado",
+            value=f"🎉 **¡Recompensa disponible!**\n"
+                  f"Usa `f.reclamar` para recibirla",
+            inline=False
+        )
+        embed.color = discord.Color.green()
+    
+    # Mostrar todas las recompensas por nivel
+    embed.add_field(
+        name="📊 Recompensas por nivel",
+        value="`Nivel 1` - 8,000 🪙\n"
+              "`Nivel 2` - 12,000 🪙\n"
+              "`Nivel 3` - 18,000 🪙\n"
+              "`Nivel 4` - 25,000 🪙\n"
+              "`Nivel 5` - 35,000 🪙\n"
+              "`Nivel 6` - 50,000 🪙\n"
+              "_Sube de nivel para mejorar tus recompensas_",
+        inline=False
+    )
+    
+    embed.set_footer(text="¡Reclama tu recompensa cada semana!")
+    await ctx.send(embed=embed)
+#=================STAT====================
     @commands.command(name='stat')
     async def stat(self, ctx):
         """Muestra las estadísticas del personaje"""
@@ -781,6 +997,9 @@ class SistemaReinos(commands.Cog):
         self.guardar_datos()
         
         await ctx.send(f"✅ {miembro.mention} ha sido eliminado del sistema de reinos.")
+
+
+
 
 # ============ SETUP ============
 async def setup(bot):
